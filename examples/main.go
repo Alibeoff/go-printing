@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	printer "go-printing"
+	"go-printing/pkg/printer"
 )
 
 func main() {
