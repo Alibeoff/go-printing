@@ -21,6 +21,14 @@ type PrintJob struct {
 	Files string
 }
 
+type PrinterStatus struct {
+	Name       string
+	IsReady    bool
+	IsPrinting bool
+	Message    string
+	JobsCount  int
+}
+
 // этот метод
 func GetAvailablePrinters() ([]string, error) {
 	// Выполняем команду lpstat -a
@@ -47,6 +55,50 @@ func GetAvailablePrinters() ([]string, error) {
 	return printers, nil
 }
 
+// CheckPrinterStatus - проверяет статус принтера
+func CheckPrinterStatus(printerName string) (*PrinterStatus, error) {
+	status := &PrinterStatus{
+		Name: printerName,
+	}
+
+	// Проверяем, принимает ли принтер задания
+	out, err := exec.Command("lpstat", "-p", printerName).CombinedOutput()
+	if err != nil {
+		status.IsReady = false
+		status.Message = fmt.Sprintf("Ошибка проверки: %v", err)
+		return status, err
+	}
+
+	output := string(out)
+	status.IsReady = strings.Contains(output, "idle") || strings.Contains(output, "printing")
+	status.IsPrinting = strings.Contains(output, "printing")
+
+	if strings.Contains(output, "disabled") {
+		status.IsReady = false
+		status.Message = "Принтер отключен"
+	} else if strings.Contains(output, "idle") {
+		status.Message = "Принтер готов к работе"
+	} else if strings.Contains(output, "printing") {
+		status.Message = "Принтер печатает"
+	} else {
+		status.Message = strings.TrimSpace(output)
+	}
+
+	// Получаем количество заданий в очереди
+	jobs, err := ActivePrintList(printerName)
+	if err == nil {
+		status.JobsCount = len(jobs)
+	}
+
+	return status, nil
+}
+
+// TestPrint - отправляет тестовую страницу
+func TestPrint(printerName string) error {
+	cmd := exec.Command("lp", "-d", printerName, "/etc/nsswitch.conf")
+	return cmd.Run()
+}
+
 func (p *Printer) PrinterList() {
 	printers, err := GetAvailablePrinters()
 	if err != nil {
@@ -58,7 +110,9 @@ func (p *Printer) PrinterList() {
 }
 
 func (p *Printer) Select(id int) string {
-	p.UsePrinter = p.Names[id]
+	if id >= 0 && id < len(p.Names) {
+		p.UsePrinter = p.Names[id]
+	}
 	return p.UsePrinter
 }
 
@@ -260,7 +314,8 @@ func ActivePrintList(printerName string) ([]PrintJob, error) {
 	return jobs, nil
 }
 
-func KillProcess(id int) {
+func KillProcess(id int) error {
 	cmd := exec.Command("cancel", strconv.Itoa(id))
 	cmd.Run()
+	return nil
 }

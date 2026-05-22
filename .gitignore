@@ -1,1 +1,4 @@
 text.txt
+.DS_Store
+.env
+go.sum

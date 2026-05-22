@@ -55,5 +55,6 @@ func (p *Printer) Do() {
 	}
 
 	cmd := exec.Command("lp", s...)
+	fmt.Println("lp +", s)
 	cmd.Run()
 }
